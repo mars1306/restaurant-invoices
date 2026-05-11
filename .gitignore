@@ -1,0 +1,13 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# App Data (Keep private)
+invoices.db
+uploads/
+logs/
+.env
+
+# OS
+.DS_Store
