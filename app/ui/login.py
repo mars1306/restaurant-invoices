@@ -22,27 +22,16 @@ def logout():
 
 def render_login_page():
     st.title("👨‍🍳 Gestion Factures SaaS")
+    st.info("Accès réservé. Veuillez vous connecter avec vos identifiants fournis.")
     
-    tab1, tab2 = st.tabs(["Connexion", "Inscription"])
+    email = st.text_input("Email", key="login_email")
+    password = st.text_input("Mot de passe", type="password", key="login_password")
     
-    with tab1:
-        email = st.text_input("Email", key="login_email")
-        password = st.text_input("Mot de passe", type="password", key="login_password")
-        if st.button("Se connecter"):
-            res, err = login(email, password)
-            if err:
-                st.error(f"Erreur : {err}")
-            else:
-                st.session_state.user = res.user
-                st.success("Connecté !")
-                st.rerun()
-                
-    with tab2:
-        new_email = st.text_input("Email", key="signup_email")
-        new_password = st.text_input("Mot de passe", type="password", key="signup_password")
-        if st.button("Créer un compte"):
-            res, err = signup(new_email, new_password)
-            if err:
-                st.error(f"Erreur : {err}")
-            else:
-                st.success("Compte créé ! Veuillez vérifier votre email (si activé) ou vous connecter.")
+    if st.button("Se connecter", use_container_width=True):
+        res, err = login(email, password)
+        if err:
+            st.error("Identifiants incorrects ou accès non autorisé.")
+        else:
+            st.session_state.user = res.user
+            st.success("Connecté !")
+            st.rerun()
