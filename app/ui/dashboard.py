@@ -20,6 +20,15 @@ logger = get_logger("ui.dashboard")
 def render() -> None:
     st.title("Tableau de bord")
 
+    # Check for API Key and show setup prompt if missing
+    anthropic_key = get_config("ANTHROPIC_API_KEY")
+    if not anthropic_key:
+        st.warning("⚠️ **Configuration requise** : Vous devez configurer votre clé API Anthropic pour utiliser l'extraction automatique.")
+        if st.button("Aller aux Paramètres ⚙️"):
+            st.session_state.nav_page = "Paramètres"
+            st.rerun()
+        st.divider()
+
     today = date.today()
     # Current week (Monday to Sunday)
     week_start = (today - timedelta(days=today.weekday()))

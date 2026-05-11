@@ -30,7 +30,7 @@ def render_login_page():
     if st.button("Se connecter", use_container_width=True):
         res, err = login(email, password)
         if err:
-            st.error(f"Erreur d'accès : {err}")
+            st.error("Identifiants incorrects ou accès non autorisé.")
         else:
             st.session_state.user = res.user
             st.success("Connecté !")

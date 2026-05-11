@@ -120,6 +120,42 @@ def kpi_unpaid() -> Dict[str, Any]:
     res = supabase.table("factures").select("total_ttc").eq("user_id", user_id).eq("statut", "non payé").execute()
     return {"count": len(res.data), "total": sum(r["total_ttc"] or 0 for r in res.data)}
 
+def spend_by_supplier_last_n_days(days: int = 30) -> List[Dict]:
+    user_id = get_current_user_id()
+    from datetime import date, timedelta
+    start_date = (date.today() - timedelta(days=days)).isoformat()
+    
+    # Simple aggregation in Python for the proto
+    res = supabase.table("factures").select("total_ttc, fournisseurs(nom)").eq("user_id", user_id).gte("date_facture", start_date).execute()
+    
+    from collections import defaultdict
+    summary = defaultdict(float)
+    for r in res.data:
+        name = r["fournisseurs"]["nom"] if r.get("fournisseurs") else "Inconnu"
+        summary[name] += (r["total_ttc"] or 0)
+    
+    return [{"fournisseur": k, "total": v} for k, v in summary.items()]
+
+def weekly_spend_last_n_weeks(weeks: int = 8) -> List[Dict]:
+    user_id = get_current_user_id()
+    from datetime import date, timedelta
+    start_date = (date.today() - timedelta(weeks=weeks)).isoformat()
+    
+    res = supabase.table("factures").select("date_facture, total_ttc").eq("user_id", user_id).gte("date_facture", start_date).execute()
+    
+    from collections import defaultdict
+    summary = defaultdict(float)
+    for r in res.data:
+        if r["date_facture"]:
+            # Convert to YYYY-WW format
+            from datetime import datetime
+            dt = datetime.strptime(r["date_facture"], "%Y-%m-%d")
+            week = dt.strftime("%Y-W%W")
+            summary[week] += (r["total_ttc"] or 0)
+            
+    sorted_weeks = sorted(summary.items())
+    return [{"semaine": k, "total": v} for k, v in sorted_weeks]
+
 def top_products_by_spend(limit: int = 15) -> List[Dict]:
     user_id = get_current_user_id()
     # Supabase/PostgreSQL aggregation is better via RPC or complex select, 
