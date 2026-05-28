@@ -14,6 +14,16 @@ load_dotenv()
 
 import streamlit as st
 from app.ui.login import render_login_page, logout
+from app.ui.style import inject
+
+# ---- Page config (must be first Streamlit call) ----
+st.set_page_config(
+    page_title="Factures — Brasserie",
+    page_icon="🍽️",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+inject()
 
 # Initialize session state for user
 if "user" not in st.session_state:
@@ -31,15 +41,6 @@ logger = get_logger("main")
 
 # Initialize DB on startup (idempotent)
 init_db()
-
-
-# ---- Page config ----
-st.set_page_config(
-    page_title="Gestion Factures Fournisseurs",
-    page_icon="🧾",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
 
 # ---- Sidebar navigation ----
 PAGES = {

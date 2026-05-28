@@ -18,7 +18,12 @@ logger = get_logger("ui.dashboard")
 
 
 def render() -> None:
-    st.title("Tableau de bord")
+    st.markdown(
+        f'<h1>Tableau de bord</h1>'
+        f'<p style="color:#6b6560;font-size:0.85rem;margin-top:-0.5rem">'
+        f'{date.today().strftime("%A %d %B %Y").capitalize()}</p>',
+        unsafe_allow_html=True,
+    )
 
     # Check for API Key and show setup prompt if missing
     anthropic_key = get_config("OPENROUTER_API_KEY")
@@ -44,18 +49,12 @@ def render() -> None:
 
     days_threshold = int(get_config("OVERDUE_DAYS_THRESHOLD", "30"))
 
-    # Mobile responsive layout for metrics
-    if st.session_state.get("mobile_mode", False):
-        st.metric("Total Semaine (TTC)", format_currency(total_week), help=f"Du {week_start.strftime('%d/%m')} au {week_end.strftime('%d/%m')}")
-        st.metric("Total Mois (TTC)", format_currency(total_month), help=f"Depuis le {month_start.strftime('%d/%m')}")
-        st.metric("Factures non payées", str(unpaid["count"]))
-        st.metric("Montant impayé (TTC)", format_currency(unpaid["total"]))
-    else:
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Total semaine (TTC)", format_currency(total_week), help=f"Du {week_start.strftime('%d/%m')} au {week_end.strftime('%d/%m')}")
-        col2.metric("Total mois (TTC)", format_currency(total_month), help=f"Depuis le {month_start.strftime('%d/%m')}")
-        col3.metric("Factures non payees", str(unpaid["count"]))
-        col4.metric("Montant impaye (TTC)", format_currency(unpaid["total"]))
+    # Responsive 4-column metric grid (Streamlit handles mobile wrapping)
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total semaine (TTC)", format_currency(total_week), help=f"Du {week_start.strftime('%d/%m')} au {week_end.strftime('%d/%m')}")
+    col2.metric("Total mois (TTC)", format_currency(total_month), help=f"Depuis le {month_start.strftime('%d/%m')}")
+    col3.metric("Factures non payées", str(unpaid["count"]))
+    col4.metric("Montant impayé (TTC)", format_currency(unpaid["total"]))
 
     st.divider()
 
@@ -73,12 +72,17 @@ def render() -> None:
                 y="total",
                 labels={"fournisseur": "Fournisseur", "total": "Total TTC (€)"},
                 color="fournisseur",
-                color_discrete_sequence=px.colors.qualitative.Set2,
+                color_discrete_sequence=["#c9a84c", "#e8c87a", "#a07830", "#d4b060"],
             )
             fig.update_layout(
                 showlegend=False,
                 xaxis_tickangle=-30,
                 margin=dict(l=0, r=0, t=20, b=0),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(26,25,22,1)",
+                font_color="#f0ede6",
+                xaxis=dict(gridcolor="#2a2722", linecolor="#2a2722"),
+                yaxis=dict(gridcolor="#2a2722", linecolor="#2a2722"),
             )
             st.plotly_chart(fig, use_container_width=True)
         else:
@@ -97,8 +101,15 @@ def render() -> None:
                 markers=True,
                 line_shape="spline",
             )
-            fig2.update_traces(line_color="#2196F3", marker_size=8)
-            fig2.update_layout(margin=dict(l=0, r=0, t=20, b=0))
+            fig2.update_traces(line_color="#c9a84c", marker_size=8, marker_color="#c9a84c")
+            fig2.update_layout(
+                margin=dict(l=0, r=0, t=20, b=0),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(26,25,22,1)",
+                font_color="#f0ede6",
+                xaxis=dict(gridcolor="#2a2722", linecolor="#2a2722"),
+                yaxis=dict(gridcolor="#2a2722", linecolor="#2a2722"),
+            )
             st.plotly_chart(fig2, use_container_width=True)
         else:
             st.info("Aucune donnee disponible pour les 8 dernieres semaines.")
