@@ -271,6 +271,44 @@ def set_config(key: str, value: str) -> None:
     supabase.table("config").upsert({"user_id": user_id, "key": key, "value": value}).execute()
 
 # ---------------------------------------------------------------------------
+# Alerts helpers
+# ---------------------------------------------------------------------------
+
+def get_overdue_invoices_raw(threshold_date: str) -> List[Dict]:
+    user_id = get_current_user_id()
+    res = (
+        supabase.table("factures")
+        .select("*, fournisseurs(nom)")
+        .eq("user_id", user_id)
+        .eq("statut", "non payé")
+        .lt("date_echeance", threshold_date)
+        .order("date_echeance")
+        .execute()
+    )
+    rows = []
+    for r in (res.data or []):
+        r["fournisseur_nom"] = (r.pop("fournisseurs", None) or {}).get("nom", "—")
+        rows.append(r)
+    return rows
+
+def get_all_product_prices() -> List[Dict]:
+    user_id = get_current_user_id()
+    res = (
+        supabase.table("produits")
+        .select("nom, prix_unitaire, factures(date_facture, fournisseurs(nom))")
+        .eq("factures.user_id", user_id)
+        .order("factures(date_facture)", desc=True)
+        .execute()
+    )
+    rows = []
+    for r in (res.data or []):
+        facture = r.pop("factures", None) or {}
+        r["date_facture"] = facture.get("date_facture")
+        r["fournisseur_nom"] = (facture.get("fournisseurs") or {}).get("nom", "—")
+        rows.append(r)
+    return rows
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
