@@ -158,19 +158,103 @@ def weekly_spend_last_n_weeks(weeks: int = 8) -> List[Dict]:
 
 def top_products_by_spend(limit: int = 15) -> List[Dict]:
     user_id = get_current_user_id()
-    # Supabase/PostgreSQL aggregation is better via RPC or complex select, 
-    # for simplicity in this proto we'll aggregate in Python or use a basic select.
-    res = supabase.table("produits").select("nom, prix_total").eq("user_id", user_id).execute()
+    res = supabase.table("produits").select("nom, prix_total, prix_unitaire, factures(fournisseurs(nom))").eq("user_id", user_id).execute()
     
     from collections import defaultdict
-    summary = defaultdict(lambda: {"total_depense": 0, "nb_achats": 0})
+    summary = defaultdict(lambda: {"total_depense": 0, "nb_achats": 0, "prix_unitaire_somme": 0, "fournisseurs": set()})
     for r in res.data:
         name = (r["nom"] or "Inconnu").strip().lower()
         summary[name]["total_depense"] += (r["prix_total"] or 0)
         summary[name]["nb_achats"] += 1
+        summary[name]["prix_unitaire_somme"] += (r["prix_unitaire"] or 0)
+        if r.get("factures") and r["factures"].get("fournisseurs"):
+            summary[name]["fournisseurs"].add(r["factures"]["fournisseurs"]["nom"])
     
     sorted_items = sorted(summary.items(), key=lambda x: x[1]["total_depense"], reverse=True)[:limit]
-    return [{"nom": k, "total_depense": v["total_depense"], "nb_achats": v["nb_achats"]} for k, v in sorted_items]
+    return [{
+        "nom": k, 
+        "total_depense": v["total_depense"], 
+        "nb_achats": v["nb_achats"],
+        "prix_unitaire_moyen": v["prix_unitaire_somme"] / v["nb_achats"] if v["nb_achats"] > 0 else 0,
+        "fournisseurs": ", ".join(list(v["fournisseurs"]))
+    } for k, v in sorted_items]
+
+def product_price_history(nom: str) -> List[Dict]:
+    user_id = get_current_user_id()
+    res = supabase.table("produits").select("prix_unitaire, quantite, factures(id, date_facture, fournisseurs(nom))").eq("user_id", user_id).ilike("nom", f"%{nom}%").execute()
+    
+    history = []
+    for r in res.data:
+        if r.get("factures"):
+            history.append({
+                "date_facture": r["factures"]["date_facture"],
+                "prix_unitaire": r["prix_unitaire"],
+                "fournisseur_nom": r["factures"]["fournisseurs"]["nom"] if r["factures"].get("fournisseurs") else "Inconnu",
+                "facture_id": r["factures"]["id"],
+                "quantite": r["quantite"]
+            })
+    return sorted(history, key=lambda x: x["date_facture"] or "")
+
+def product_price_by_supplier(nom: str) -> List[Dict]:
+    user_id = get_current_user_id()
+    res = supabase.table("produits").select("prix_unitaire, factures(fournisseurs(nom))").eq("user_id", user_id).ilike("nom", f"%{nom}%").execute()
+    
+    from collections import defaultdict
+    summary = defaultdict(list)
+    for r in res.data:
+        if r.get("factures") and r["factures"].get("fournisseurs"):
+            f_nom = r["factures"]["fournisseurs"]["nom"]
+            summary[f_nom].append(r["prix_unitaire"] or 0)
+            
+    results = []
+    for f_nom, prices in summary.items():
+        results.append({
+            "fournisseur_nom": f_nom,
+            "prix_unitaire_moyen": sum(prices) / len(prices),
+            "prix_unitaire_min": min(prices),
+            "prix_unitaire_max": max(prices),
+            "nb_achats": len(prices)
+        })
+    return sorted(results, key=lambda x: x["prix_unitaire_moyen"])
+
+def supplier_price_index() -> List[Dict]:
+    user_id = get_current_user_id()
+    # 1. Get all products and their suppliers
+    res = supabase.table("produits").select("nom, prix_unitaire, factures(fournisseurs(nom))").eq("user_id", user_id).execute()
+    
+    from collections import defaultdict
+    prod_prices = defaultdict(list)
+    sup_prod_prices = defaultdict(lambda: defaultdict(list))
+    
+    for r in res.data:
+        if not r["nom"] or not r.get("factures") or not r["factures"].get("fournisseurs"): continue
+        name = r["nom"].strip().lower()
+        f_nom = r["factures"]["fournisseurs"]["nom"]
+        price = r["prix_unitaire"] or 0
+        prod_prices[name].append(price)
+        sup_prod_prices[f_nom][name].append(price)
+        
+    # 2. Calc market average per product
+    market_avg = {name: sum(p)/len(p) for name, p in prod_prices.items()}
+    
+    # 3. Calc per-supplier deviation
+    results = []
+    for f_nom, prods in sup_prod_prices.items():
+        diffs = []
+        for name, prices in prods.items():
+            avg_sup_price = sum(prices) / len(prices)
+            avg_mkt_price = market_avg[name]
+            if avg_mkt_price > 0:
+                diffs.append(((avg_sup_price - avg_mkt_price) / avg_mkt_price) * 100)
+        
+        if diffs:
+            results.append({
+                "fournisseur": f_nom,
+                "nb_produits": len(diffs),
+                "surprix_moyen_pct": round(sum(diffs) / len(diffs), 2)
+            })
+            
+    return sorted(results, key=lambda x: x["surprix_moyen_pct"], reverse=True)
 
 # ---------------------------------------------------------------------------
 # Config

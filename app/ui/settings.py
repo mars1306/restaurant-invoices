@@ -20,18 +20,18 @@ def render() -> None:
     st.markdown("---")
     # API Keys Section
     st.header("Connexion AI")
-    anthropic_key = get_config("ANTHROPIC_API_KEY", "")
-    
+    openrouter_key = get_config("OPENROUTER_API_KEY", "")
+
     new_key = st.text_input(
-        "Clé API Anthropic (Claude)", 
-        value=anthropic_key, 
+        "Clé API OpenRouter",
+        value=openrouter_key,
         type="password",
-        help="Utilisée pour l'extraction automatique des factures via Claude Vision."
+        help="Utilisée pour l'extraction automatique des factures via Claude Vision sur OpenRouter."
     )
-    
-    if st.button("Enregistrer la clé API"):
+
+    if st.button("Enregistrer la clé OpenRouter"):
         if new_key:
-            set_config("ANTHROPIC_API_KEY", new_key)
+            set_config("OPENROUTER_API_KEY", new_key)
             st.success("Clé API enregistrée avec succès !")
         else:
             st.warning("Veuillez entrer une clé valide.")

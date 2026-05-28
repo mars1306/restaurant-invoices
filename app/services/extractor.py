@@ -1,5 +1,5 @@
 """
-Anthropic Claude Vision-based invoice extraction.
+Claude Vision-based invoice extraction via OpenRouter.
 Supports PDF (first page converted via pdf2image) and image files.
 """
 import base64
@@ -7,7 +7,7 @@ import io
 import os
 from typing import Any, Dict
 
-from anthropic import Anthropic
+from openai import OpenAI
 
 from app.database.queries import get_config
 from app.utils.helpers import safe_json_loads
@@ -41,11 +41,11 @@ USER_PROMPT = (
 )
 
 
-def _get_client() -> Anthropic:
-    api_key = get_config("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+def _get_client() -> OpenAI:
+    api_key = get_config("OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY is not set. Please configure it in the Paramètres page.")
-    return Anthropic(api_key=api_key)
+        raise ValueError("OPENROUTER_API_KEY is not set. Please configure it in the Paramètres page.")
+    return OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
 
 
 def _file_to_base64_image(file_bytes: bytes, mime_type: str) -> str:
@@ -103,29 +103,22 @@ def extract_invoice(file_bytes: bytes, filename: str) -> Dict[str, Any]:
         client = _get_client()
 
         logger.info("Calling Claude vision for: %s", filename)
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
+        response = client.chat.completions.create(
+            model="anthropic/claude-sonnet-4-6",
             max_tokens=2048,
-            system=SYSTEM_PROMPT,
             messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": mime_type,
-                                "data": b64,
-                            },
-                        },
+                        {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64}"}},
                         {"type": "text", "text": USER_PROMPT},
                     ],
-                }
+                },
             ],
         )
 
-        raw_text = response.content[0].text if response.content else ""
+        raw_text = response.choices[0].message.content if response.choices else ""
         logger.debug("Raw extraction response: %s", raw_text[:500])
 
         parsed = safe_json_loads(raw_text)
